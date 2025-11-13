@@ -57,7 +57,21 @@ if [ -d "$ORIGINAL_HOME/.nvm" ]; then
         \. "$NVM_DIR/nvm.sh" # This loads nvm
         # Initialize and find the path to the currently active or default Node version's bin directory
         NODE_BIN_PATH=""
-        NODE_BIN_PATH=$(nvm which current | xargs dirname 2>/dev/null || find "$NVM_DIR/versions/node" -maxdepth 2 -type d -name 'bin' | sort -V | tail -n 1)
+
+        # Temporarily disable errexit while probing NVM so failures don't terminate the script
+        set +e
+        CURRENT_NODE_PATH=$(nvm which current 2>/dev/null || true)
+        NVM_WHICH_STATUS=$?
+        set -e
+
+        if [ "$NVM_WHICH_STATUS" -eq 0 ] && [ -n "$CURRENT_NODE_PATH" ]; then
+            NODE_BIN_PATH=$(dirname "$CURRENT_NODE_PATH")
+        else
+            # Fall back to scanning installed NVM versions only when the direct lookup failed
+            set +e
+            NODE_BIN_PATH=$(find "$NVM_DIR/versions/node" -maxdepth 2 -type d -name 'bin' | sort -V | tail -n 1 || true)
+            set -e
+        fi
 
         if [ -n "$NODE_BIN_PATH" ] && [ -d "$NODE_BIN_PATH" ]; then
             echo "Adding NVM Node bin path to PATH: $NODE_BIN_PATH"
