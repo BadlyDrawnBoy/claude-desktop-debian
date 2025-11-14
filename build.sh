@@ -56,52 +56,56 @@ if [ -d "$ORIGINAL_HOME/.nvm" ]; then
     if [ -s "$NVM_DIR/nvm.sh" ]; then
         # Source NVM script to set up NVM environment variables temporarily
         # shellcheck disable=SC1091
+        set +e
         . "$NVM_DIR/nvm.sh" # This loads nvm
         NVM_SOURCE_STATUS=$?
+        set -e
         if [ "$NVM_SOURCE_STATUS" -eq 0 ]; then
             echo "nvm.sh sourced successfully from $NVM_DIR"
         else
-            echo "Warning: sourcing $NVM_DIR/nvm.sh exited with status $NVM_SOURCE_STATUS"
+            echo "Warning: sourcing $NVM_DIR/nvm.sh exited with status $NVM_SOURCE_STATUS, continuing without NVM."
         fi
-        echo "PATH immediately after sourcing nvm.sh: $PATH"
-        # Initialize and find the path to the currently active or default Node version's bin directory
-        NODE_BIN_PATH=""
+        if [ "$NVM_SOURCE_STATUS" -eq 0 ]; then
+            echo "PATH immediately after sourcing nvm.sh: $PATH"
+            # Initialize and find the path to the currently active or default Node version's bin directory
+            NODE_BIN_PATH=""
 
-        # Temporarily disable errexit while probing NVM so failures don't terminate the script
-        set +e
-        CURRENT_NODE_PATH=$(nvm which current 2>/dev/null || true)
-        NVM_WHICH_STATUS=$?
-        set -e
-        echo "nvm which current exit status: $NVM_WHICH_STATUS"
-        if [ -n "$CURRENT_NODE_PATH" ]; then
-            echo "nvm which current output: $CURRENT_NODE_PATH"
-        else
-            echo "nvm which current produced no output"
-        fi
-
-        if [ "$NVM_WHICH_STATUS" -eq 0 ] && [ -n "$CURRENT_NODE_PATH" ]; then
-            NODE_BIN_PATH=$(dirname "$CURRENT_NODE_PATH")
-            echo "Using Node bin path from nvm which: $NODE_BIN_PATH"
-        else
-            # Fall back to scanning installed NVM versions only when the direct lookup failed
-            FALLBACK_FIND_CMD="find \"$NVM_DIR/versions/node\" -maxdepth 2 -type d -name 'bin' | sort -V | tail -n 1"
-            echo "nvm which current failed, running fallback command: $FALLBACK_FIND_CMD"
+            # Temporarily disable errexit while probing NVM so failures don't terminate the script
             set +e
-            NODE_BIN_PATH=$(find "$NVM_DIR/versions/node" -maxdepth 2 -type d -name 'bin' | sort -V | tail -n 1 || true)
-            FIND_STATUS=$?
+            CURRENT_NODE_PATH=$(nvm which current 2>/dev/null || true)
+            NVM_WHICH_STATUS=$?
             set -e
-            if [ -n "$NODE_BIN_PATH" ]; then
-                echo "Fallback find command succeeded (exit $FIND_STATUS) with result: $NODE_BIN_PATH"
+            echo "nvm which current exit status: $NVM_WHICH_STATUS"
+            if [ -n "$CURRENT_NODE_PATH" ]; then
+                echo "nvm which current output: $CURRENT_NODE_PATH"
             else
-                echo "Fallback find command exit status: $FIND_STATUS (no bin directories found)"
+                echo "nvm which current produced no output"
             fi
-        fi
 
-        if [ -n "$NODE_BIN_PATH" ] && [ -d "$NODE_BIN_PATH" ]; then
-            echo "Adding NVM Node bin path to PATH: $NODE_BIN_PATH"
-            export PATH="$NODE_BIN_PATH:$PATH"
-        else
-            echo "Warning: Could not determine NVM Node bin path."
+            if [ "$NVM_WHICH_STATUS" -eq 0 ] && [ -n "$CURRENT_NODE_PATH" ]; then
+                NODE_BIN_PATH=$(dirname "$CURRENT_NODE_PATH")
+                echo "Using Node bin path from nvm which: $NODE_BIN_PATH"
+            else
+                # Fall back to scanning installed NVM versions only when the direct lookup failed
+                FALLBACK_FIND_CMD="find \"$NVM_DIR/versions/node\" -maxdepth 2 -type d -name 'bin' | sort -V | tail -n 1"
+                echo "nvm which current failed, running fallback command: $FALLBACK_FIND_CMD"
+                set +e
+                NODE_BIN_PATH=$(find "$NVM_DIR/versions/node" -maxdepth 2 -type d -name 'bin' | sort -V | tail -n 1 || true)
+                FIND_STATUS=$?
+                set -e
+                if [ -n "$NODE_BIN_PATH" ]; then
+                    echo "Fallback find command succeeded (exit $FIND_STATUS) with result: $NODE_BIN_PATH"
+                else
+                    echo "Fallback find command exit status: $FIND_STATUS (no bin directories found)"
+                fi
+            fi
+
+            if [ -n "$NODE_BIN_PATH" ] && [ -d "$NODE_BIN_PATH" ]; then
+                echo "Adding NVM Node bin path to PATH: $NODE_BIN_PATH"
+                export PATH="$NODE_BIN_PATH:$PATH"
+            else
+                echo "Warning: Could not determine NVM Node bin path."
+            fi
         fi
     else
         echo "Warning: nvm.sh script not found or not sourceable."
